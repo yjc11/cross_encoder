@@ -63,9 +63,9 @@ def read_text_pair(data_path):
     with open(data_path, "r", encoding="utf-8") as f:
         for line in f:
             data = line.rstrip().split("\t")
-            if len(data) != 3:
+            if len(data) != 4:
                 continue
-            yield {"text_a": data[0], "text_b": data[1]}
+            yield {"text_a": data[0], "text_b": data[2]}
 
 
 def read_data(data_path):
@@ -76,11 +76,11 @@ def read_data(data_path):
             if i == 0:
                 continue
             data = line.rstrip("\n").split("\t")
-            if len(data) != 3:
+            if len(data) != 4:
                 print(data)
                 continue
             query = data[0]
-            title = data[1]
+            title = data[2]
             label = data[-1]
             # breakpoint()
             yield {"text_a": query, "text_b": title, "label": int(label)}
