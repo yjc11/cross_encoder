@@ -79,9 +79,6 @@ def read_data(data_path):
     """Reads data."""
     with open(data_path, "r", encoding="utf-8", errors="ignore") as f:
         for i, line in enumerate(f):
-            # Skip column name
-            if i == 0:
-                continue
             data = line.rstrip("\n").split("\t")
             if len(data) != 5:
                 print(data)
