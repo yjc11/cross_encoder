@@ -68,7 +68,7 @@ def evaluate(model, metric, data_loader, phase="dev"):
     metric.reset()
 
     for idx, batch in enumerate(data_loader):
-        input_ids, token_type_ids, labels = batch
+        input_ids, token_type_ids, labels, page = batch
 
         pos_probs = model(input_ids=input_ids, token_type_ids=token_type_ids)
 
@@ -108,6 +108,7 @@ def do_train():
         Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),  # segment
         Stack(dtype="int64"),  # label
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),
     ): [data for data in fn(samples)]
 
     train_data_loader = create_dataloader(
@@ -151,7 +152,7 @@ def do_train():
     tic_train = time.time()
     for epoch in range(1, args.epochs + 1):
         for step, batch in enumerate(train_data_loader, start=1):
-            input_ids, token_type_ids, labels = batch
+            input_ids, token_type_ids, labels, page = batch
             logits = model(input_ids, token_type_ids)
             loss = criterion(logits, labels)
             probs = F.softmax(logits, axis=1)
