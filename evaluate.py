@@ -14,6 +14,7 @@
 
 import argparse
 import os
+import time
 import random
 from paddlenlp.utils.log import logger
 from functools import partial
@@ -60,21 +61,26 @@ def evaluate(model, metric, data_loader, tokenizer, phase="dev"):
         metric(obj:`paddle.metric.Metric`): The evaluation metric.
     """
     model.eval()
-    # metric.reset()
     recall = metric.Recall()
     precision = metric.Precision()
 
+    data_nums = 0
     results = list()
     tag_pred_label = defaultdict(lambda: defaultdict(list))
+    start_time = time.time()
     for idx, batch in enumerate(data_loader):
         input_ids, token_type_ids, labels, tag = batch
+        data_nums += len(tag)
 
         pos_probs = model(input_ids=input_ids, token_type_ids=token_type_ids)
-
         sim_score = F.softmax(pos_probs)
         probs = sim_score.numpy()[:, 1] > 0.9
 
         results.extend(list(zip(tag, probs, labels)))
+
+    end_time = time.time()
+    time_diff = end_time - start_time
+    logger.info(f"data nums: {data_nums}, time: {time_diff}s")
 
     for res in results:
         decoded_tag = tokenizer.decode(res[0]).replace('[PAD]', '').strip()
@@ -97,7 +103,6 @@ def evaluate(model, metric, data_loader, tokenizer, phase="dev"):
 
     metrics_df = pd.DataFrame.from_dict(metric_res, orient="index")
     # metrics_df.to_excel("./ metrics.xlsx")
-    logger.info("*********** Metrics Summary ***********")
     logger.info(metrics_df.to_string())
 
     model.train()
