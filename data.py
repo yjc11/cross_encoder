@@ -50,17 +50,19 @@ def convert_example(
     else:
         text = example["text"]
         text_pair = None
+
     encoded_inputs = tokenizer(
         text=text, text_pair=text_pair, max_seq_len=max_seq_length
     )
     input_ids = encoded_inputs["input_ids"]
     token_type_ids = encoded_inputs["token_type_ids"]
+    query = input_ids[1 : len(text) + 1]  # [CLS] tag [SEP]
     # breakpoint()
 
     if is_test:
         return input_ids, token_type_ids
     label = np.array([example["label"]], dtype="int64")
-    return input_ids, token_type_ids, label
+    return input_ids, token_type_ids, label, query
 
 
 def read_text_pair(data_path):
@@ -87,8 +89,14 @@ def read_data(data_path):
             query = data[0]
             title = data[2]
             label = data[-1]
+            page = data[-2]
             # breakpoint()
-            yield {"text_a": query, "text_b": title, "label": int(label)}
+            yield {
+                "text_a": query,
+                "text_b": title,
+                "label": int(label),
+                "page": str(page),
+            }
 
 
 def create_dataloader(

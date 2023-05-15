@@ -130,3 +130,4 @@ workspace
 local_settings
 logs
 output
+*.xlsx

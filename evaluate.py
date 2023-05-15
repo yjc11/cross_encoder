@@ -15,9 +15,12 @@
 import argparse
 import os
 import random
+from paddlenlp.utils.log import logger
 from functools import partial
+from collections import defaultdict
 
 import numpy as np
+import pandas as pd
 import paddle
 import paddle.nn.functional as F
 from data import convert_example, create_dataloader, read_data
@@ -47,7 +50,7 @@ def set_seed(seed):
 
 
 @paddle.no_grad()
-def evaluate(model, metric, data_loader, phase="dev"):
+def evaluate(model, metric, data_loader, tokenizer, phase="dev"):
     """
     Given a dataset, it evals model and computes the metric.
 
@@ -57,18 +60,46 @@ def evaluate(model, metric, data_loader, phase="dev"):
         metric(obj:`paddle.metric.Metric`): The evaluation metric.
     """
     model.eval()
-    metric.reset()
+    # metric.reset()
+    recall = metric.Recall()
+    precision = metric.Precision()
 
+    results = list()
+    tag_pred_label = defaultdict(lambda: defaultdict(list))
     for idx, batch in enumerate(data_loader):
-        input_ids, token_type_ids, labels = batch
+        input_ids, token_type_ids, labels, tag = batch
 
         pos_probs = model(input_ids=input_ids, token_type_ids=token_type_ids)
 
         sim_score = F.softmax(pos_probs)
-        metric.update(preds=sim_score.numpy(), labels=labels)
+        probs = sim_score.numpy()[:, 1] > 0.9
 
-    print("eval_{} auc:{:.3}".format(phase, metric.accumulate()))
-    metric.reset()
+        results.extend(list(zip(tag, probs, labels)))
+
+    for res in results:
+        decoded_tag = tokenizer.decode(res[0]).replace('[PAD]', '').strip()
+        tag_pred_label[decoded_tag]['pred'].append(res[1])
+        tag_pred_label[decoded_tag]['label'].append(res[2])
+
+    metric_res = defaultdict(dict)
+    for k, v in tag_pred_label.items():
+        recall.reset()
+        precision.reset()
+        cur_preds = np.array(v['pred'])
+        cur_labels = np.array(v['label'])
+        recall.update(preds=cur_preds, labels=cur_labels)
+        precision.update(preds=cur_preds, labels=cur_labels)
+        metric_res[k]['precision'] = precision.accumulate()
+        metric_res[k]['recall'] = recall.accumulate()
+
+    recall.reset()
+    precision.reset()
+
+    metrics_df = pd.DataFrame.from_dict(metric_res, orient="index")
+    # metrics_df.to_excel("./ metrics.xlsx")
+    logger.info("*********** Metrics Summary ***********")
+    logger.info(metrics_df.to_string())
+
     model.train()
 
 
@@ -81,19 +112,31 @@ def main():
 
     dev_ds = load_dataset(read_data, data_path=args.test_file, lazy=False)
 
-    model = AutoModelForSequenceClassification.from_pretrained(args.model_name_or_path, num_classes=2)
+    model = AutoModelForSequenceClassification.from_pretrained(
+        args.model_name_or_path, num_classes=2
+    )
     tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
 
-    trans_func_eval = partial(convert_example, tokenizer=tokenizer, max_seq_length=args.max_seq_length, is_pair=True)
+    trans_func_eval = partial(
+        convert_example,
+        tokenizer=tokenizer,
+        max_seq_length=args.max_seq_length,
+        is_pair=True,
+    )
 
     batchify_fn_eval = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # pair_input
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),  # pair_segment
         Stack(dtype="int64"),  # label
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),
     ): [data for data in fn(samples)]
 
     dev_data_loader = create_dataloader(
-        dev_ds, mode="dev", batch_size=args.batch_size, batchify_fn=batchify_fn_eval, trans_fn=trans_func_eval
+        dev_ds,
+        mode="dev",
+        batch_size=args.batch_size,
+        batchify_fn=batchify_fn_eval,
+        trans_fn=trans_func_eval,
     )
     # breakpoint()
     if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
@@ -102,8 +145,8 @@ def main():
     else:
         raise ValueError("Please set --params_path with correct pretrained model file")
 
-    metric = paddle.metric.Auc()
-    evaluate(model, metric, dev_data_loader, "dev")
+    metric = paddle.metric
+    evaluate(model, metric, dev_data_loader, tokenizer, "dev")
 
 
 if __name__ == "__main__":
