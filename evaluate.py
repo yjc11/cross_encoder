@@ -29,12 +29,12 @@ from paddlenlp.transformers import AutoModelForSequenceClassification, AutoToken
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--test_file", type=str, required=True, help="The full path of test file")
-parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded.")
+parser.add_argument("--max_seq_length", default=512, type=int, help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded.")
 parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.")
 parser.add_argument('--model_name_or_path', default="rocketqa-base-cross-encoder", help="The pretrained model used for training")
 parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path of checkpoint to be loaded.")
 parser.add_argument("--seed", type=int, default=1000, help="Random seed for initialization.")
-parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
+parser.add_argument('--device', default="gpu", help="Select which device to train model, defaults to gpu.")
 args = parser.parse_args()
 # yapf: enable
 
@@ -95,7 +95,7 @@ def main():
     dev_data_loader = create_dataloader(
         dev_ds, mode="dev", batch_size=args.batch_size, batchify_fn=batchify_fn_eval, trans_fn=trans_func_eval
     )
-
+    # breakpoint()
     if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
         state_dict = paddle.load(args.init_from_ckpt)
         model.set_dict(state_dict)

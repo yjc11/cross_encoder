@@ -15,7 +15,9 @@ import numpy as np
 import paddle
 
 
-def convert_example(example, tokenizer, max_seq_length=512, is_test=False, is_pair=False):
+def convert_example(
+    example, tokenizer, max_seq_length=512, is_test=False, is_pair=False
+):
     """
     Builds model inputs from a sequence or a pair of sequence for sequence classification tasks
     by concatenating and adding special tokens. And creates a mask from the two sequences passed
@@ -48,9 +50,12 @@ def convert_example(example, tokenizer, max_seq_length=512, is_test=False, is_pa
     else:
         text = example["text"]
         text_pair = None
-    encoded_inputs = tokenizer(text=text, text_pair=text_pair, max_seq_len=max_seq_length)
+    encoded_inputs = tokenizer(
+        text=text, text_pair=text_pair, max_seq_len=max_seq_length
+    )
     input_ids = encoded_inputs["input_ids"]
     token_type_ids = encoded_inputs["token_type_ids"]
+    # breakpoint()
 
     if is_test:
         return input_ids, token_type_ids
@@ -63,7 +68,7 @@ def read_text_pair(data_path):
     with open(data_path, "r", encoding="utf-8") as f:
         for line in f:
             data = line.rstrip().split("\t")
-            if len(data) != 4:
+            if len(data) != 5:
                 continue
             yield {"text_a": data[0], "text_b": data[2]}
 
@@ -76,7 +81,7 @@ def read_data(data_path):
             if i == 0:
                 continue
             data = line.rstrip("\n").split("\t")
-            if len(data) != 4:
+            if len(data) != 5:
                 print(data)
                 continue
             query = data[0]
@@ -86,14 +91,25 @@ def read_data(data_path):
             yield {"text_a": query, "text_b": title, "label": int(label)}
 
 
-def create_dataloader(dataset, mode="train", batch_size=1, batchify_fn=None, trans_fn=None):
+def create_dataloader(
+    dataset, mode="train", batch_size=1, batchify_fn=None, trans_fn=None
+):
     if trans_fn:
         dataset = dataset.map(trans_fn)
 
     shuffle = True if mode == "train" else False
     if mode == "train":
-        batch_sampler = paddle.io.DistributedBatchSampler(dataset, batch_size=batch_size, shuffle=shuffle)
+        batch_sampler = paddle.io.DistributedBatchSampler(
+            dataset, batch_size=batch_size, shuffle=shuffle
+        )
     else:
-        batch_sampler = paddle.io.BatchSampler(dataset, batch_size=batch_size, shuffle=shuffle)
+        batch_sampler = paddle.io.BatchSampler(
+            dataset, batch_size=batch_size, shuffle=shuffle
+        )
 
-    return paddle.io.DataLoader(dataset=dataset, batch_sampler=batch_sampler, collate_fn=batchify_fn, return_list=True)
+    return paddle.io.DataLoader(
+        dataset=dataset,
+        batch_sampler=batch_sampler,
+        collate_fn=batchify_fn,
+        return_list=True,
+    )

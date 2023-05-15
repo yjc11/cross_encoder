@@ -24,12 +24,16 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--params_path", type=str, required=True, default='./checkpoint/model_900/model_state.pdparams', help="The path to model parameters to be loaded.")
 parser.add_argument("--output_path", type=str, default='./output', help="The path of model parameter in static graph to be saved.")
 parser.add_argument('--model_name_or_path', default="rocketqa-base-cross-encoder", help="The pretrained model used for training")
+parser.add_argument('--device', default="gpu", help="Select which device to train model, defaults to gpu.")
 args = parser.parse_args()
 # yapf: enable
 
 if __name__ == "__main__":
+    paddle.device.set_device(args.device)
     tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
-    model = AutoModelForSequenceClassification.from_pretrained(args.model_name_or_path, num_classes=2)
+    model = AutoModelForSequenceClassification.from_pretrained(
+        args.model_name_or_path, num_classes=2
+    )
 
     if args.params_path and os.path.isfile(args.params_path):
         state_dict = paddle.load(args.params_path)

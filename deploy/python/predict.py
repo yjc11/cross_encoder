@@ -32,7 +32,7 @@ sys.path.append(".")
 parser = argparse.ArgumentParser()
 parser.add_argument("--model_dir", type=str, required=True, help="The directory to static model.")
 parser.add_argument("--input_file", type=str, required=True, help="The test set file.")
-parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded.")
+parser.add_argument("--max_seq_length", default=512, type=int, help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded.")
 parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.")
 parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
 parser.add_argument('--use_tensorrt', default=False, type=eval, choices=[True, False], help='Enable to use tensorrt to speed up.')
@@ -51,13 +51,12 @@ def read_text_pair(data_path):
     with open(data_path, "r", encoding="utf-8") as f:
         for line in f:
             data = line.rstrip().split("\t")
-            if len(data) != 3:
+            if len(data) != 5:
                 continue
-            yield {"query": data[0], "title": data[1]}
+            yield {"query": data[0], "title": data[2]}
 
 
 def convert_example(example, tokenizer, max_seq_length=512, is_test=False):
-
     query, title = example["query"], example["title"]
 
     encoded_inputs = tokenizer(text=query, text_pair=title, max_seq_len=max_seq_length)
@@ -108,7 +107,9 @@ class Predictor(object):
 
             if args.use_tensorrt:
                 config.enable_tensorrt_engine(
-                    max_batch_size=batch_size, min_subgraph_size=30, precision_mode=precision_mode
+                    max_batch_size=batch_size,
+                    min_subgraph_size=30,
+                    precision_mode=precision_mode,
                 )
         elif device == "cpu":
             # set CPU configs accordingly,
@@ -125,8 +126,13 @@ class Predictor(object):
 
         config.switch_use_feed_fetch_ops(False)
         self.predictor = paddle.inference.create_predictor(config)
-        self.input_handles = [self.predictor.get_input_handle(name) for name in self.predictor.get_input_names()]
-        self.output_handle = self.predictor.get_output_handle(self.predictor.get_output_names()[0])
+        self.input_handles = [
+            self.predictor.get_input_handle(name)
+            for name in self.predictor.get_input_names()
+        ]
+        self.output_handle = self.predictor.get_output_handle(
+            self.predictor.get_output_names()[0]
+        )
 
         if args.benchmark:
             import auto_log
@@ -165,7 +171,9 @@ class Predictor(object):
 
         examples = []
         for text in data:
-            input_ids, segment_ids = convert_example(text, tokenizer, max_seq_length=self.max_seq_length, is_test=True)
+            input_ids, segment_ids = convert_example(
+                text, tokenizer, max_seq_length=self.max_seq_length, is_test=True
+            )
             examples.append((input_ids, segment_ids))
 
         batchify_fn = lambda samples, fn=Tuple(
@@ -210,7 +218,10 @@ if __name__ == "__main__":
 
     data = [{"query": d["query"], "title": d["title"]} for d in test_ds]
 
-    batches = [data[idx : idx + args.batch_size] for idx in range(0, len(data), args.batch_size)]
+    batches = [
+        data[idx : idx + args.batch_size]
+        for idx in range(0, len(data), args.batch_size)
+    ]
 
     results = []
     for batch_data in batches:

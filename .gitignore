@@ -128,3 +128,5 @@ FETCH_HEAD
 
 workspace
 local_settings
+logs
+output
