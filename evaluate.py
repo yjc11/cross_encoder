@@ -63,20 +63,21 @@ def evaluate(model, metric, data_loader, tokenizer, phase="dev"):
     model.eval()
     recall = metric.Recall()
     precision = metric.Precision()
+    auc = metric.Auc()
 
     data_nums = 0
     results = list()
     tag_pred_label = defaultdict(lambda: defaultdict(list))
     start_time = time.time()
     for idx, batch in enumerate(data_loader):
-        input_ids, token_type_ids, labels, tag = batch
+        input_ids, token_type_ids, labels, tag = batch  # (128, )
         data_nums += len(tag)
 
         pos_probs = model(input_ids=input_ids, token_type_ids=token_type_ids)
-        sim_score = F.softmax(pos_probs)
-        probs = sim_score.numpy()[:, 1] > 0.9
+        sim_score = F.softmax(pos_probs)  # (n,2)
+        probs = sim_score.numpy()[:, 1] > 0.95
 
-        results.extend(list(zip(tag, probs, labels)))
+        results.extend(list(zip(tag, probs, labels, sim_score)))
 
     end_time = time.time()
     time_diff = end_time - start_time
@@ -86,6 +87,7 @@ def evaluate(model, metric, data_loader, tokenizer, phase="dev"):
         decoded_tag = tokenizer.decode(res[0]).replace('[PAD]', '').strip()
         tag_pred_label[decoded_tag]['pred'].append(res[1])
         tag_pred_label[decoded_tag]['label'].append(res[2])
+        tag_pred_label[decoded_tag]['ori_pred'].append(res[3])
 
     metric_res = defaultdict(dict)
     for k, v in tag_pred_label.items():
@@ -93,16 +95,21 @@ def evaluate(model, metric, data_loader, tokenizer, phase="dev"):
         precision.reset()
         cur_preds = np.array(v['pred'])
         cur_labels = np.array(v['label'])
+        ori_pred = np.array(v['ori_pred'])
         recall.update(preds=cur_preds, labels=cur_labels)
         precision.update(preds=cur_preds, labels=cur_labels)
+        auc.update(preds=ori_pred, labels=cur_labels)
         metric_res[k]['precision'] = precision.accumulate()
         metric_res[k]['recall'] = recall.accumulate()
+        metric_res[k]['auc'] = auc.accumulate()
+        print(f'{k}, tp: {recall.tp}, fp: {precision.fp}, fn: {recall.fn}')
 
     recall.reset()
     precision.reset()
+    auc.reset()
 
     metrics_df = pd.DataFrame.from_dict(metric_res, orient="index")
-    # metrics_df.to_excel("./ metrics.xlsx")
+    metrics_df.to_excel("./ metrics.xlsx")
     logger.info(metrics_df.to_string())
 
     model.train()
