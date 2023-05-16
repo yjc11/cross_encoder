@@ -42,6 +42,7 @@ parser.add_argument('--enable_mkldnn', default=False, type=eval, choices=[True, 
 parser.add_argument("--benchmark", type=eval, default=False, help="To log some information about environment and running.")
 parser.add_argument("--save_log_path", type=str, default="./log_output/", help="The file path to save log.")
 parser.add_argument('--model_name_or_path', default="rocketqa-base-cross-encoder", help="The pretrained model used for training")
+parser.add_argument('--query', type=str, default="签订日期", help="")
 args = parser.parse_args()
 # yapf: enable
 
@@ -203,7 +204,7 @@ if __name__ == "__main__":
 
     test_ds = load_dataset(read_text_pair, data_path=args.input_file, lazy=False)
 
-    data = [{"query": d["query"], "title": d["title"]} for d in test_ds]
+    data = [{"query": args.query, "title": d["title"]} for d in test_ds]
 
     batches = [
         data[idx : idx + args.batch_size]
