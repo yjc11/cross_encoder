@@ -76,7 +76,7 @@ class Predictor(object):
         self,
         model_dir,
         device="gpu",
-        max_seq_length=128,
+        max_seq_length=512,
         batch_size=32,
         use_tensorrt=False,
         precision="fp32",
@@ -97,7 +97,7 @@ class Predictor(object):
         if device == "gpu":
             # set GPU configs accordingly
             # such as initialize the gpu memory, enable tensorrt
-            config.enable_use_gpu(100, 0)
+            config.enable_use_gpu(100, 1)
             precision_map = {
                 "fp16": inference.PrecisionType.Half,
                 "fp32": inference.PrecisionType.Float32,
@@ -154,18 +154,6 @@ class Predictor(object):
             )
 
     def predict(self, data, tokenizer):
-        """
-        Predicts the data labels.
-
-        Args:
-            data (obj:`List(str)`): The batch data whose each element is a raw text.
-            tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer`
-                which contains most of the methods. Users should refer to the superclass for more information regarding methods.
-            label_map(obj:`dict`): The label id (key) to label str (value) map.
-
-        Returns:
-            results(obj:`dict`): All the predictions labels.
-        """
         if args.benchmark:
             self.autolog.times.start()
 
